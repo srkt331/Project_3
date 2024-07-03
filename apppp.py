@@ -187,7 +187,7 @@ if uploaded_file:
                 fig.update_layout(title_text='Comparison between original close price vs predicted close price',
                                   plot_bgcolor='white')
                 fig.update_xaxes(showgrid=False)
-                fig.update_yaxes(showgrid(False))
+                fig.update_yaxes(showgrid=False)
                 st.plotly_chart(fig)
     except Exception as e:
         st.error(f"An error occurred: {e}")
