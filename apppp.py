@@ -1,3 +1,5 @@
+streamlit install matplotlib seaborn numpy pandas scikit-learn tensorflow plotly streamlit
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
