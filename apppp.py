@@ -10,29 +10,24 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 import plotly.express as px
 import io
-
-# Suppressing warnings for cleaner output
 import warnings
+
 warnings.filterwarnings("ignore")
 
-# Title and file upload
 st.title("Stock Price Prediction using LSTM")
 st.sidebar.header("Upload your file")
 uploaded_file = st.sidebar.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx"])
 
-# Main logic
 if uploaded_file:
     st.write("## File Uploaded Successfully")
     file_type = uploaded_file.name.split('.')[-1]
     
     try:
-        # Load data from file
         if file_type == "csv":
             reliance = pd.read_csv(uploaded_file, index_col='Date', parse_dates=True)
         elif file_type == "xlsx":
             reliance = pd.read_excel(uploaded_file, index_col='Date', parse_dates=True)
 
-        # Handling missing data
         if reliance.isnull().values.any():
             st.write("## Handling Missing Data")
             st.write("Data contains NaN values. Filling NaN values with forward fill method.")
@@ -41,7 +36,6 @@ if uploaded_file:
                 st.write("Some NaN values still exist. Filling remaining NaN values with backward fill method.")
                 reliance.fillna(method='bfill', inplace=True)
 
-        # Dataset preview and information
         st.write("## Dataset Preview")
         st.write(reliance.head())
 
@@ -54,18 +48,15 @@ if uploaded_file:
         s = buffer.getvalue()
         st.text(s)
 
-        # Correlation heatmap
         st.write("## Correlation Heatmap")
         plt.figure(figsize=(10, 8))
         sns.heatmap(reliance.corr(), annot=True)
         st.pyplot()
 
-        # Pairplot
         st.write("## Pairplot")
         sns.pairplot(reliance)
         st.pyplot()
 
-        # Time series plots
         st.write("## Time Series Plots")
         fig, axes = plt.subplots(2, 2, figsize=(20, 10))
         reliance['Open'].plot(ax=axes[0, 0], title='Open', color='green')
@@ -77,7 +68,6 @@ if uploaded_file:
             ax.set_ylabel('Price')
         st.pyplot(fig)
 
-        # Volume plot
         st.write("## Volume Plot")
         plt.figure(figsize=(20, 8))
         plt.plot(reliance['Volume'])
@@ -86,7 +76,6 @@ if uploaded_file:
         plt.title('Date vs Volume')
         st.pyplot()
 
-        # Moving averages
         st.write("## Moving Averages")
         reliance_ma = reliance.copy()
         reliance_ma['30-day MA'] = reliance['Close'].rolling(window=30).mean()
@@ -110,13 +99,12 @@ if uploaded_file:
         plt.ylabel('Price')
         st.pyplot()
 
-        # Model training
         st.write("## Model Training")
         close_df = pd.DataFrame(reliance['Close']).reset_index()
         close_stock = close_df.copy()
         close_df.drop(columns=['Date'], inplace=True)
-        scaler = MinMaxScaler(feature_range=(0,1))
-        closedf = scaler.fit_transform(close_df.values.reshape(-1,1))
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        closedf = scaler.fit_transform(close_df.values.reshape(-1, 1))
 
         training_size = int(len(closedf) * 0.86)
         test_size = len(closedf) - training_size
@@ -161,8 +149,8 @@ if uploaded_file:
 
                 train_predict = scaler.inverse_transform(train_predict)
                 test_predict = scaler.inverse_transform(test_predict)
-                original_ytrain = scaler.inverse_transform(y_train.reshape(-1,1))
-                original_ytest = scaler.inverse_transform(y_test.reshape(-1,1))
+                original_ytrain = scaler.inverse_transform(y_train.reshape(-1, 1))
+                original_ytest = scaler.inverse_transform(y_test.reshape(-1, 1))
 
                 st.write("### Performance Metrics")
                 st.write("Train data RMSE: ", mean_squared_error(original_ytrain, train_predict, squared=False))
@@ -186,7 +174,6 @@ if uploaded_file:
                 start_index = len(closedf) - len(test_predict)
                 testPredictPlot[start_index:, :] = test_predict
 
-                names = cycle(['Original close price', 'Train predicted close price', 'Test predicted close price'])
                 plotdf = pd.DataFrame({
                     'Date': close_stock['Date'],
                     'original_close': close_stock['Close'],
@@ -195,15 +182,10 @@ if uploaded_file:
                 })
 
                 fig = px.line(plotdf, x=plotdf['Date'], y=[plotdf['original_close'], plotdf['train_predicted_close'], plotdf['test_predicted_close']],
-                              labels={'value': 'Stock price', 'Date': 'Date'})
-                fig.update_layout(title_text='Comparison between original close price vs predicted close price',
-                                  plot_bgcolor='white')
-                fig.update_xaxes(showgrid=False)
-                fig.update_yaxes(showgrid=False)
+                              labels={'value': 'Stock price', 'Date': 'Date'},
+                              title='Original vs Predicted Close Price')
                 st.plotly_chart(fig)
-
     except Exception as e:
         st.error(f"An error occurred: {e}")
-
 else:
-    st.info("Please upload a CSV or Excel file.")
+    st.write("Please upload a file to continue.")
