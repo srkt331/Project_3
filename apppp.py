@@ -1,4 +1,3 @@
-pip install -r requirements.txt
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,7 +26,6 @@ if uploaded_file:
     elif file_type == "xlsx":
         reliance = pd.read_excel(uploaded_file, index_col='Date', parse_dates=True)
 
-    # Check for NaN values and handle them
     if reliance.isnull().values.any():
         st.write("## Handling Missing Data")
         st.write("Data contains NaN values. Filling NaN values with forward fill method.")
@@ -35,7 +33,7 @@ if uploaded_file:
         if reliance.isnull().values.any():
             st.write("Some NaN values still exist. Filling remaining NaN values with backward fill method.")
             reliance.fillna(method='bfill', inplace=True)
-    
+
     st.write("## Dataset Preview")
     st.write(reliance.head())
 
@@ -49,7 +47,7 @@ if uploaded_file:
     st.text(s)
 
     st.write("## Correlation Heatmap")
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 8))
     sns.heatmap(reliance.corr(), annot=True)
     st.pyplot(plt.gcf())
 
@@ -58,15 +56,18 @@ if uploaded_file:
     st.pyplot(plt.gcf())
 
     st.write("## Time Series Plots")
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(20, 10))
     reliance['Open'].plot(ax=axes[0, 0], title='Open', color='green')
     reliance['Close'].plot(ax=axes[0, 1], title='Close', color='red')
     reliance['High'].plot(ax=axes[1, 0], title='High', color='blue')
-    reliance['Low'].plot(ax=axes[1, 1], title='Low', color='cyan')
+    reliance['Low'].plot(ax=axes[1, 1], title='Low', color='c')
+    for ax in axes.flatten():
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Price')
     st.pyplot(fig)
 
     st.write("## Volume Plot")
-    plt.figure(figsize=(15, 6))
+    plt.figure(figsize=(20, 8))
     plt.plot(reliance['Volume'])
     plt.xlabel('Date')
     plt.ylabel('Volume')
@@ -78,7 +79,7 @@ if uploaded_file:
     reliance_ma['30-day MA'] = reliance['Close'].rolling(window=30).mean()
     reliance_ma['100-day MA'] = reliance['Close'].rolling(window=100).mean()
 
-    plt.figure(figsize=(15, 6))
+    plt.figure(figsize=(20, 7))
     plt.plot(reliance_ma['Close'], label='Original data')
     plt.plot(reliance_ma['30-day MA'], label='30-MA')
     plt.legend()
@@ -87,7 +88,7 @@ if uploaded_file:
     plt.ylabel('Price')
     st.pyplot(plt.gcf())
 
-    plt.figure(figsize=(15, 6))
+    plt.figure(figsize=(20, 7))
     plt.plot(reliance_ma['Close'], label='Original data')
     plt.plot(reliance_ma['100-day MA'], label='100-MA')
     plt.legend()
@@ -133,9 +134,12 @@ if uploaded_file:
     st.write("### Model Summary")
     model.summary(print_fn=lambda x: st.text(x))
 
+    epochs = 20
+    batch_size = 32
+
     if st.button("Train Model"):
         with st.spinner("Training the model..."):
-            model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=20, batch_size=32, verbose=1)
+            model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=epochs, batch_size=batch_size, verbose=1)
             st.success("Model trained successfully!")
 
             train_predict = model.predict(X_train)
@@ -176,78 +180,12 @@ if uploaded_file:
                 'test_predicted_close': testPredictPlot.reshape(-1).tolist()
             })
 
-            fig = px.line(plotdf, x='Date', y=['original_close', 'train_predicted_close', 'test_predicted_close'],
+            fig = px.line(plotdf, x=plotdf['Date'], y=[plotdf['original_close'], plotdf['train_predicted_close'], plotdf['test_predicted_close']],
                           labels={'value': 'Stock price', 'Date': 'Date'})
             fig.update_layout(title_text='Comparison between original close price vs predicted close price',
-                              plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
-            fig.for_each_trace(lambda t: t.update(name=next(names)))
+                              plot_bgcolor='white')
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(showgrid=False)
             st.plotly_chart(fig)
-
-            st.write("### Future Prediction")
-            x_input = test_data[len(test_data) - time_step:].reshape(1, -1)
-            temp_input = list(x_input[0])
-            lst_output = []
-
-            pred_days = st.slider("Number of days to predict", min_value=1, max_value=365, value=30, step=1)
-            if st.button("Predict"):
-                with st.spinner("Predicting future values..."):
-                    i = 0
-                    while i < pred_days:
-                        if len(temp_input) > time_step:
-                            x_input = np.array(temp_input[1:])
-                            x_input = x_input.reshape(1, -1)
-                            x_input = x_input.reshape((1, time_step, 1))
-                            yhat = model.predict(x_input, verbose=0)
-                            temp_input.extend(yhat[0].tolist())
-                            temp_input = temp_input[1:]
-                            lst_output.extend(yhat.tolist())
-                            i += 1
-                        else:
-                            x_input = x_input.reshape((1, time_step, 1))
-                            yhat = model.predict(x_input, verbose=0)
-                            temp_input.extend(yhat[0].tolist())
-                            lst_output.extend(yhat.tolist())
-
-                    last_days = np.arange(1, time_step + 1)
-                    day_pred = np.arange(time_step + 1, time_step + pred_days + 1)
-
-                    temp_mat = np.empty((len(last_days) + pred_days + 1, 1))
-                    temp_mat[:] = np.nan
-                    temp_mat = temp_mat.reshape(1, -1).tolist()[0]
-
-                    last_original_days_value = temp_mat
-                    next_predicted_days_value = temp_mat
-
-                    last_original_days_value[0:time_step + 1] = scaler.inverse_transform(
-                        closedf[len(closedf) - time_step:]).reshape(-1).tolist()
-                    next_predicted_days_value[time_step + 1:] = scaler.inverse_transform(
-                        np.array(lst_output).reshape(-1, 1)).reshape(-1).tolist()
-
-                    new_pred_plot = pd.DataFrame({
-                        'last_original_days_value': last_original_days_value,
-                        'next_predicted_days_value': next_predicted_days_value
-                    })
-
-                    names = cycle(['Last 15 days close price', 'Predicted next 30 days close price'])
-                    fig = px.line(new_pred_plot, labels={'value': 'Stock price', 'index': 'Timestamp'})
-                    fig.update_layout(title_text='Compare last 15 days vs next 30 days',
-                                      plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Close Price')
-                    fig.for_each_trace(lambda t: t.update(name=next(names)))
-                    fig.update_xaxes(showgrid=False)
-                    fig.update_yaxes(showgrid(False))
-                    st.plotly_chart(fig)
-
-                    lstmdf = closedf.tolist()
-                    lstmdf.extend(np.array(lst_output).reshape(-1, 1).tolist())
-                    lstmdf = scaler.inverse_transform(lstmdf).reshape(-1).tolist()
-
-                    names = cycle(['Close price'])
-                    fig = px.line(lstmdf, labels={'value': 'Stock price', 'index': 'Timestamp'})
-                    fig.update_layout(title_text='Plotting whole closing stock price with prediction',
-                                      plot_bgcolor='white', font_size=15, font_color='black', legend_title_text='Stock')
-                    fig.for_each_trace(lambda t: t.update(name=next(names)))
-                    fig.update_xaxes(showgrid(False))
-                    fig.update_yaxes(showgrid(False))
-                    st.plotly_chart(fig)
+else:
+    st.info("Please upload a CSV or Excel file.")
