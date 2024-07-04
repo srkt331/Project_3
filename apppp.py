@@ -51,11 +51,11 @@ if uploaded_file:
         st.write("## Correlation Heatmap")
         plt.figure(figsize=(10, 8))
         sns.heatmap(reliance.corr(), annot=True)
-        st.pyplot()
+        st.pyplot(plt.gcf())
 
         st.write("## Pairplot")
         sns.pairplot(reliance)
-        st.pyplot()
+        st.pyplot(plt.gcf())
 
         st.write("## Time Series Plots")
         fig, axes = plt.subplots(2, 2, figsize=(20, 10))
@@ -74,7 +74,7 @@ if uploaded_file:
         plt.xlabel('Date')
         plt.ylabel('Volume')
         plt.title('Date vs Volume')
-        st.pyplot()
+        st.pyplot(plt.gcf())
 
         st.write("## Moving Averages")
         reliance_ma = reliance.copy()
@@ -88,7 +88,7 @@ if uploaded_file:
         plt.title('Stock Price vs 30-day Moving Average')
         plt.xlabel('Date')
         plt.ylabel('Price')
-        st.pyplot()
+        st.pyplot(plt.gcf())
 
         plt.figure(figsize=(20, 7))
         plt.plot(reliance_ma['Close'], label='Original data')
@@ -97,7 +97,7 @@ if uploaded_file:
         plt.title('Stock Price vs 100-day Moving Average')
         plt.xlabel('Date')
         plt.ylabel('Price')
-        st.pyplot()
+        st.pyplot(plt.gcf())
 
         st.write("## Model Training")
         close_df = pd.DataFrame(reliance['Close']).reset_index()
@@ -185,6 +185,59 @@ if uploaded_file:
                               labels={'value': 'Stock price', 'Date': 'Date'},
                               title='Original vs Predicted Close Price')
                 st.plotly_chart(fig)
+
+        st.write("## Future Price Prediction")
+        x_input = test_data[len(test_data) - time_step:].reshape(1, -1)
+        temp_input = list(x_input.flatten())
+        lst_output = []
+
+        selected_day = st.sidebar.slider("Select day to predict future close price", min_value=1, max_value=31, value=1, step=1)
+        if st.button("Predict"):
+            with st.spinner("Predicting future values..."):
+                i = 0
+                while i < selected_day:
+                    if len(temp_input) > time_step:
+                        x_input = np.array(temp_input[1:])
+                        x_input = x_input.reshape(1, -1)
+                        x_input = x_input.reshape((1, time_step, 1))
+                        yhat = model.predict(x_input, verbose=0)
+                        temp_input.extend(yhat[0].tolist())
+                        temp_input = temp_input[1:]
+                        lst_output.extend(yhat.tolist())
+                        i += 1
+                    else:
+                        x_input = x_input.reshape((1, time_step, 1))
+                        yhat = model.predict(x_input, verbose=0)
+                        temp_input.extend(yhat[0].tolist())
+                        lst_output.extend(yhat.tolist())
+
+                last_days = np.arange(1, time_step + 1)
+                day_pred = np.arange(time_step + 1, time_step + selected_day + 1)
+
+                temp_mat = np.empty((len(last_days) + selected_day + 1, 1))
+                temp_mat[:] = np.nan
+                temp_mat = temp_mat.reshape(1, -1).tolist()[0]
+
+                last_original_days_value = temp_mat
+                next_predicted_days_value = temp_mat
+
+                last_original_days_value[0:time_step + 1] = scaler.inverse_transform(
+                    closedf[len(closedf) - time_step:]).reshape(-1).tolist()
+                next_predicted_days_value[time_step + 1:] = scaler.inverse_transform(
+                    np.array(lst_output).reshape(-1, 1)).reshape(-1).tolist()
+
+                new_pred_plot = pd.DataFrame({
+                    'last_original_days_value': last_original_days_value,
+                    'next_predicted_days_value': next_predicted_days_value
+                })
+
+                fig = px.line(new_pred_plot, 
+                              x=np.arange(len(new_pred_plot)), 
+                              y=[new_pred_plot['last_original_days_value'], new_pred_plot['next_predicted_days_value']], 
+                              labels={'value': 'Stock Price', 'index': 'Time'}, 
+                              title='Future Stock Price Prediction')
+                st.plotly_chart(fig)
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
 else:
